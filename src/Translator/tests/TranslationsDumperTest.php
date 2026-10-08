@@ -130,6 +130,54 @@ class TranslationsDumperTest extends TestCase
         $this->assertFileDoesNotExist(self::$translationsDumpDir.'/index.d.ts');
     }
 
+    /**
+     * @dataProvider translationIdentifierProvider
+     */
+    #[DataProvider('translationIdentifierProvider')]
+    public function testDumpTranslationIdentifier(string $id, string $expectedLiteral, string $extension): void
+    {
+        $translationsDumper = new TranslationsDumper(
+            new MessageParametersExtractor(),
+            new IntlMessageParametersExtractor(),
+            new TypeScriptMessageParametersPrinter(),
+            new Filesystem(),
+        );
+        $translationsDumper->dump(
+            catalogues: [new MessageCatalogue('en', ['messages' => [$id => 'Translated message']])],
+            dumpDir: self::$translationsDumpDir,
+        );
+
+        $expectedValue = 'js' === $extension
+            ? '{"translations":{"messages":{"en":"Translated message"}}},'
+            : "Message<{ 'messages': { parameters: NoParametersType } }, 'en'>;";
+        $content = file_get_contents(self::$translationsDumpDir.'/index.'.$extension);
+
+        $this->assertStringEndsWith("    $expectedLiteral: $expectedValue\n};\n", $content);
+    }
+
+    public static function translationIdentifierProvider(): iterable
+    {
+        $identifiers = [
+            'ordinary' => ['notification.comment_created', '"notification.comment_created"'],
+            'quote' => ['a"b', '"a\\"b"'],
+            'backslash' => ['a\\b', '"a\\\\b"'],
+            'injection' => [
+                'audit\\": alert(\'hello!\'), //',
+                '"audit\\\\\\": alert(\'hello!\'), \\/\\/"',
+            ],
+            'newline' => ["line\nbreak", '"line\\nbreak"'],
+            'controls' => ["\0\x01\x08\t\r\f", '"\\u0000\\u0001\\b\\t\\r\\f"'],
+            'unicode' => ["\u{03BB}\u{96EA}\u{2023}🔥㊋", '"\\u03bb\\u96ea\\u2023\\ud83d\\udd25\\u328b"'],
+            'numeric' => ['123', '"123"'],
+        ];
+
+        foreach ($identifiers as $name => [$id, $expectedLiteral]) {
+            foreach (['js', 'd.ts'] as $extension) {
+                yield $name.' '.$extension => [$id, $expectedLiteral, $extension];
+            }
+        }
+    }
+
     public function testDumpWithExcludedDomains()
     {
         $translationsDumper = new TranslationsDumper(

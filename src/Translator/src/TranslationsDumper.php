@@ -102,10 +102,10 @@ class TranslationsDumper
         $additions = [];
         $typescriptAdditions = [];
         foreach ($this->getTranslations($catalogues, $excludedDomains, $includedDomains, $includeKeysRegex, $excludeKeysRegex) as $translationId => $translationsByDomainAndLocale) {
-            $translationId = str_replace('"', '\\"', $translationId);
+            $translationId = json_encode((string) $translationId, \JSON_THROW_ON_ERROR);
 
             $additions[] = \sprintf(
-                '    "%s": %s,%s',
+                '    %s: %s,%s',
                 $translationId,
                 json_encode(['translations' => $translationsByDomainAndLocale], \JSON_THROW_ON_ERROR),
                 "\n"
@@ -113,7 +113,7 @@ class TranslationsDumper
 
             if ($dumpTypeScript) {
                 $typescriptAdditions[] = \sprintf(
-                    '    "%s": %s;%s',
+                    '    %s: %s;%s',
                     $translationId,
                     $this->getTranslationsTypeScriptTypeDefinition($translationsByDomainAndLocale),
                     "\n"
